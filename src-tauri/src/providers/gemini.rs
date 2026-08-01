@@ -80,7 +80,11 @@ impl ModelProvider for GeminiProvider {
     async fn decide(&self, context: DecisionContext) -> Result<SpeakerDecision, ProviderError> {
         let text = self
             .complete(
-                decision_system(&context.member.role_name, &context.member.role_instruction),
+                decision_system(
+                    &context.member.role_name,
+                    &context.member.role_instruction,
+                    &context.visible_sources,
+                ),
                 &context.visible_messages,
             )
             .await?;
@@ -90,7 +94,11 @@ impl ModelProvider for GeminiProvider {
     async fn reply(&self, context: ReplyContext) -> Result<ModelReply, ProviderError> {
         let text = self
             .complete(
-                reply_system(&context.member.role_name, &context.member.role_instruction),
+                reply_system(
+                    &context.member.role_name,
+                    &context.member.role_instruction,
+                    &context.visible_sources,
+                ),
                 &context.visible_messages,
             )
             .await?;

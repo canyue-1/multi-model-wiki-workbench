@@ -65,6 +65,14 @@ pub struct Message {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct SourceExcerpt {
+    pub id: String,
+    pub title: String,
+    pub excerpt: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ConversationThread {
     pub conversation: Conversation,
     pub members: Vec<ModelMember>,
@@ -85,6 +93,7 @@ pub struct DecisionContext {
     pub trigger_message_id: String,
     pub member: ModelMember,
     pub visible_messages: Vec<Message>,
+    pub visible_sources: Vec<SourceExcerpt>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -93,6 +102,7 @@ pub struct ReplyContext {
     pub conversation_id: String,
     pub member: ModelMember,
     pub visible_messages: Vec<Message>,
+    pub visible_sources: Vec<SourceExcerpt>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

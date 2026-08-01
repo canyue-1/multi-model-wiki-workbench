@@ -5,3 +5,5 @@ src-tauri/target/
 src-tauri/gen/schemas/
 .vite/
 *.tsbuildinfo
+.playwright-cli/
+output/

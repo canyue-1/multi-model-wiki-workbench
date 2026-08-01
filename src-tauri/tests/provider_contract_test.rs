@@ -88,5 +88,6 @@ fn test_context() -> DecisionContext {
             role_instruction: "分析约束".into(),
         },
         visible_messages: Vec::new(),
+        visible_sources: Vec::new(),
     }
 }

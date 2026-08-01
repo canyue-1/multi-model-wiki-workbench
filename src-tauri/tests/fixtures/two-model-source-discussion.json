@@ -1,0 +1,20 @@
+{
+  "conversationTitle": "多模型路由评审",
+  "message": "请基于附加资料给出首版架构结论。",
+  "members": [
+    {
+      "provider": "openai",
+      "model": "fixture-reply",
+      "roleName": "分析师",
+      "roleInstruction": "综合资料并给出可执行结论。",
+      "behavior": "reply"
+    },
+    {
+      "provider": "anthropic",
+      "model": "fixture-silent",
+      "roleName": "审校员",
+      "roleInstruction": "仅在发现矛盾时补充。",
+      "behavior": "silent"
+    }
+  ]
+}

@@ -8,7 +8,7 @@ use thiserror::Error;
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
-use crate::domain::{ReviewStatus, WikiPage, WikiRevision};
+use crate::domain::{ConversationSnapshot, ReviewStatus, WikiPage, WikiRevision};
 use crate::repository::{NewWikiRevision, RepositoryError, WorkspaceRepository};
 
 #[derive(Debug, Clone)]
@@ -78,6 +78,24 @@ impl WikiService {
             &change.source_ids,
         )?;
         Ok(revision)
+    }
+
+    pub async fn apply_conversation(
+        &self,
+        snapshot: &ConversationSnapshot,
+    ) -> Result<WikiRevision, WikiError> {
+        let conversation = &snapshot.thread.conversation;
+        self.apply(WikiChange {
+            relative_path: PathBuf::from("conversations").join(format!("{}.md", conversation.id)),
+            markdown: conversation_markdown(snapshot),
+            source_ids: snapshot
+                .sources
+                .iter()
+                .map(|source| source.id.clone())
+                .collect(),
+            reason: format!("讨论结束后自动整理：{}", one_line(&conversation.title)),
+        })
+        .await
     }
 
     pub async fn rollback(&self, revision_id: &str) -> Result<(), WikiError> {
@@ -247,6 +265,97 @@ impl WikiService {
         file.sync_all()?;
         Ok(())
     }
+}
+
+fn conversation_markdown(snapshot: &ConversationSnapshot) -> String {
+    const SOURCE_EXCERPT_CHARS: usize = 1_200;
+    let mut markdown = format!(
+        "# {}\n\n由本地多模型讨论自动整理，所有内容均可通过下方资料 ID 与公开消息追溯。\n\n",
+        one_line(&snapshot.thread.conversation.title)
+    );
+
+    markdown.push_str("## 讨论结论\n\n");
+    let model_messages: Vec<_> = snapshot
+        .thread
+        .messages
+        .iter()
+        .filter(|message| message.author_kind == "model")
+        .collect();
+    if model_messages.is_empty() {
+        markdown.push_str("本轮没有模型发言。\n\n");
+    } else {
+        for message in model_messages {
+            let role = message
+                .author_id
+                .as_deref()
+                .and_then(|author_id| {
+                    snapshot
+                        .thread
+                        .members
+                        .iter()
+                        .find(|member| member.id == author_id)
+                })
+                .map(|member| one_line(&member.role_name))
+                .unwrap_or_else(|| "模型".to_owned());
+            markdown.push_str(&format!(
+                "### {role}\n\n{}\n\n",
+                quote_markdown(&message.content)
+            ));
+        }
+    }
+
+    markdown.push_str("## 来源\n\n");
+    if snapshot.sources.is_empty() {
+        markdown.push_str("本轮未附加资料。\n\n");
+    } else {
+        for source in &snapshot.sources {
+            markdown.push_str(&format!(
+                "### {}\n\n- 资料 ID：`{}`\n- 原始文件：`{}`\n\n",
+                one_line(&source.title),
+                source.id,
+                source.raw_path.replace('`', "")
+            ));
+            if let Some(text) = source.extracted_text.as_deref() {
+                let excerpt: String = text.chars().take(SOURCE_EXCERPT_CHARS).collect();
+                markdown.push_str(&format!("{}\n\n", quote_markdown(&excerpt)));
+            } else if let Some(error) = source.extraction_error.as_deref() {
+                markdown.push_str(&format!("提取失败：{}\n\n", one_line(error)));
+            }
+        }
+    }
+
+    markdown.push_str("## 公开消息\n\n");
+    for message in &snapshot.thread.messages {
+        let author = match message.author_kind.as_str() {
+            "user" => "你".to_owned(),
+            "model" => message
+                .author_id
+                .as_deref()
+                .and_then(|author_id| {
+                    snapshot
+                        .thread
+                        .members
+                        .iter()
+                        .find(|member| member.id == author_id)
+                })
+                .map(|member| one_line(&member.role_name))
+                .unwrap_or_else(|| "模型".to_owned()),
+            _ => "系统".to_owned(),
+        };
+        markdown.push_str(&format!(
+            "### {author}\n\n{}\n\n",
+            quote_markdown(&message.content)
+        ));
+    }
+    markdown
+}
+
+fn quote_markdown(value: &str) -> String {
+    value
+        .lines()
+        .map(|line| format!("> {line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn validate_relative_path(path: &Path) -> Result<PathBuf, WikiError> {

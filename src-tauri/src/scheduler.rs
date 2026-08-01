@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use thiserror::Error;
 
 use crate::domain::{
-    CycleState, DecisionContext, DiscussionEvent, MemberFailure, ReplyContext, SpeakerDecision,
-    StopReason,
+    CycleState, DecisionContext, DiscussionEvent, MemberFailure, ReplyContext, SourceExcerpt,
+    SpeakerDecision, StopReason,
 };
 use crate::providers::ModelProvider;
 use crate::repository::{RepositoryError, WorkspaceRepository};
@@ -46,6 +46,11 @@ impl DiscussionScheduler {
         &self,
         initial_event: DiscussionEvent,
     ) -> Result<CycleState, SchedulerError> {
+        let sources = self
+            .repository
+            .list_sources(Some(&initial_event.conversation_id))
+            .await?;
+        let visible_sources = source_excerpts(&sources);
         let mut queue = VecDeque::from([initial_event]);
         let mut model_message_count = 0;
         let mut failures = Vec::new();
@@ -101,6 +106,7 @@ impl DiscussionScheduler {
                     trigger_message_id: event.trigger_message_id.clone(),
                     member: member.clone(),
                     visible_messages: thread.messages.clone(),
+                    visible_sources: visible_sources.clone(),
                 };
                 match provider.decide(context).await {
                     Ok(SpeakerDecision::Reply { reason, priority }) => {
@@ -174,6 +180,7 @@ impl DiscussionScheduler {
                     conversation_id: event.conversation_id.clone(),
                     member: member.clone(),
                     visible_messages: latest.messages,
+                    visible_sources: visible_sources.clone(),
                 };
                 match provider.reply(reply_context).await {
                     Ok(reply) => {
@@ -224,6 +231,28 @@ impl DiscussionScheduler {
             failures,
         ))
     }
+}
+
+fn source_excerpts(sources: &[crate::domain::SourceRecord]) -> Vec<SourceExcerpt> {
+    const MAX_CHARS: usize = 6_000;
+    let mut remaining = MAX_CHARS;
+    let mut excerpts = Vec::new();
+    for source in sources {
+        let Some(text) = source.extracted_text.as_deref() else {
+            continue;
+        };
+        if remaining == 0 {
+            break;
+        }
+        let excerpt: String = text.chars().take(remaining).collect();
+        remaining = remaining.saturating_sub(excerpt.chars().count());
+        excerpts.push(SourceExcerpt {
+            id: source.id.clone(),
+            title: source.title.clone(),
+            excerpt,
+        });
+    }
+    excerpts
 }
 
 fn cycle_state(

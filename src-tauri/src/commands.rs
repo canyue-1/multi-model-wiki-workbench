@@ -209,9 +209,17 @@ impl AppState {
         stop_signal.store(false, Ordering::Relaxed);
         let scheduler = DiscussionScheduler::new(self.repository.clone(), providers)
             .with_stop_signal(stop_signal);
-        let mut event = crate::domain::DiscussionEvent::new(input.conversation_id, message.id);
+        let conversation_id = input.conversation_id;
+        let mut event = crate::domain::DiscussionEvent::new(conversation_id.clone(), message.id);
         event.mentioned_member_id = input.mentioned_member_id;
-        Ok(scheduler.handle_event(event).await?)
+        let cycle = scheduler.handle_event(event).await?;
+        if cycle.model_message_count > 0 {
+            let snapshot = self.load_snapshot(&conversation_id).await?;
+            WikiService::new(&self.workspace_root, self.repository.clone())
+                .apply_conversation(&snapshot)
+                .await?;
+        }
+        Ok(cycle)
     }
 
     pub fn stop_discussion(&self, conversation_id: &str) -> Result<(), AppError> {
