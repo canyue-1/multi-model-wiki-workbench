@@ -6,7 +6,8 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::domain::{
-    Conversation, ConversationThread, Message, ModelMember, ProviderKind, SourceRecord,
+    Conversation, ConversationThread, Message, ModelMember, ProviderKind, ReviewItem, ReviewStatus,
+    SourceRecord, WikiRevision,
 };
 
 #[derive(Debug, Error)]
@@ -17,6 +18,10 @@ pub enum RepositoryError {
     Migration(#[from] sqlx::migrate::MigrateError),
     #[error("stored provider is invalid: {0}")]
     InvalidProvider(String),
+    #[error("stored review status is invalid: {0}")]
+    InvalidReviewStatus(String),
+    #[error("stored JSON is invalid: {0}")]
+    InvalidJson(#[from] serde_json::Error),
 }
 
 #[derive(Clone)]
@@ -32,6 +37,16 @@ pub struct NewSource<'a> {
     pub content_hash: &'a str,
     pub extracted_text: Option<&'a str>,
     pub extraction_error: Option<&'a str>,
+}
+
+pub struct NewWikiRevision<'a> {
+    pub relative_path: &'a str,
+    pub before_content: Option<&'a str>,
+    pub after_content: &'a str,
+    pub before_hash: Option<&'a str>,
+    pub after_hash: &'a str,
+    pub source_ids: &'a [String],
+    pub reason: &'a str,
 }
 
 impl WorkspaceRepository {
@@ -235,6 +250,76 @@ impl WorkspaceRepository {
         Ok(source_from_row(row)?)
     }
 
+    pub async fn create_wiki_revision(
+        &self,
+        revision: NewWikiRevision<'_>,
+    ) -> Result<WikiRevision, RepositoryError> {
+        let revision_id = Uuid::new_v4().to_string();
+        let review_id = Uuid::new_v4().to_string();
+        let source_ids_json = serde_json::to_string(revision.source_ids)?;
+        let mut transaction = self.pool.begin().await?;
+        sqlx::query(
+            "INSERT INTO wiki_revisions (id, relative_path, before_content, after_content, before_hash, after_hash, source_ids_json, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&revision_id)
+        .bind(revision.relative_path)
+        .bind(revision.before_content)
+        .bind(revision.after_content)
+        .bind(revision.before_hash)
+        .bind(revision.after_hash)
+        .bind(source_ids_json)
+        .bind(revision.reason)
+        .execute(&mut *transaction)
+        .await?;
+        sqlx::query("INSERT INTO review_items (id, revision_id) VALUES (?, ?)")
+            .bind(review_id)
+            .bind(&revision_id)
+            .execute(&mut *transaction)
+            .await?;
+        transaction.commit().await?;
+        self.load_wiki_revision(&revision_id).await
+    }
+
+    pub async fn load_wiki_revision(
+        &self,
+        revision_id: &str,
+    ) -> Result<WikiRevision, RepositoryError> {
+        let row = sqlx::query(
+            "SELECT w.id, w.relative_path, w.before_content, w.after_content, w.before_hash, w.after_hash, w.source_ids_json, w.reason, w.created_at, r.status FROM wiki_revisions w JOIN review_items r ON r.revision_id = w.id WHERE w.id = ?",
+        )
+        .bind(revision_id)
+        .fetch_one(&self.pool)
+        .await?;
+        wiki_revision_from_row(row)
+    }
+
+    pub async fn list_review_items(&self) -> Result<Vec<ReviewItem>, RepositoryError> {
+        let rows = sqlx::query(
+            "SELECT r.id, r.revision_id, r.status, r.created_at, r.reviewed_at, w.relative_path, w.reason, w.source_ids_json, w.before_content, w.after_content FROM review_items r JOIN wiki_revisions w ON w.id = r.revision_id ORDER BY r.created_at, r.rowid",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(review_item_from_row).collect()
+    }
+
+    pub async fn set_review_status(
+        &self,
+        revision_id: &str,
+        status: ReviewStatus,
+    ) -> Result<(), RepositoryError> {
+        let result = sqlx::query(
+            "UPDATE review_items SET status = ?, reviewed_at = CURRENT_TIMESTAMP WHERE revision_id = ?",
+        )
+        .bind(status.as_storage())
+        .bind(revision_id)
+        .execute(&self.pool)
+        .await?;
+        if result.rows_affected() == 0 {
+            return Err(RepositoryError::Database(sqlx::Error::RowNotFound));
+        }
+        Ok(())
+    }
+
     async fn load_conversation(&self, id: &str) -> Result<Conversation, RepositoryError> {
         let row = sqlx::query("SELECT id, title, created_at FROM conversations WHERE id = ?")
             .bind(id)
@@ -280,5 +365,41 @@ fn source_from_row(row: sqlx::sqlite::SqliteRow) -> Result<SourceRecord, sqlx::E
         extracted_text: row.try_get("extracted_text")?,
         extraction_error: row.try_get("extraction_error")?,
         created_at: row.try_get("created_at")?,
+    })
+}
+
+fn wiki_revision_from_row(row: sqlx::sqlite::SqliteRow) -> Result<WikiRevision, RepositoryError> {
+    let status: String = row.try_get("status")?;
+    let source_ids_json: String = row.try_get("source_ids_json")?;
+    Ok(WikiRevision {
+        id: row.try_get("id")?,
+        relative_path: row.try_get("relative_path")?,
+        before_content: row.try_get("before_content")?,
+        after_content: row.try_get("after_content")?,
+        before_hash: row.try_get("before_hash")?,
+        after_hash: row.try_get("after_hash")?,
+        source_ids: serde_json::from_str(&source_ids_json)?,
+        reason: row.try_get("reason")?,
+        created_at: row.try_get("created_at")?,
+        review_pending: status == ReviewStatus::Pending.as_storage(),
+    })
+}
+
+fn review_item_from_row(row: sqlx::sqlite::SqliteRow) -> Result<ReviewItem, RepositoryError> {
+    let stored_status: String = row.try_get("status")?;
+    let status = ReviewStatus::from_storage(&stored_status)
+        .ok_or_else(|| RepositoryError::InvalidReviewStatus(stored_status.clone()))?;
+    let source_ids_json: String = row.try_get("source_ids_json")?;
+    Ok(ReviewItem {
+        id: row.try_get("id")?,
+        revision_id: row.try_get("revision_id")?,
+        path: row.try_get("relative_path")?,
+        reason: row.try_get("reason")?,
+        status,
+        source_ids: serde_json::from_str(&source_ids_json)?,
+        before_content: row.try_get("before_content")?,
+        after_content: row.try_get("after_content")?,
+        created_at: row.try_get("created_at")?,
+        reviewed_at: row.try_get("reviewed_at")?,
     })
 }

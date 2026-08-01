@@ -156,3 +156,63 @@ pub struct SourceRecord {
     pub extraction_error: Option<String>,
     pub created_at: String,
 }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ReviewStatus {
+    Pending,
+    Accepted,
+    Incorrect,
+    RolledBack,
+}
+
+impl ReviewStatus {
+    pub fn as_storage(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Accepted => "accepted",
+            Self::Incorrect => "incorrect",
+            Self::RolledBack => "rolled_back",
+        }
+    }
+
+    pub fn from_storage(value: &str) -> Option<Self> {
+        match value {
+            "pending" => Some(Self::Pending),
+            "accepted" => Some(Self::Accepted),
+            "incorrect" => Some(Self::Incorrect),
+            "rolled_back" => Some(Self::RolledBack),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WikiRevision {
+    pub id: String,
+    pub relative_path: String,
+    pub before_content: Option<String>,
+    pub after_content: String,
+    pub before_hash: Option<String>,
+    pub after_hash: String,
+    pub source_ids: Vec<String>,
+    pub reason: String,
+    pub created_at: String,
+    pub review_pending: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewItem {
+    pub id: String,
+    pub revision_id: String,
+    pub path: String,
+    pub reason: String,
+    pub status: ReviewStatus,
+    pub source_ids: Vec<String>,
+    pub before_content: Option<String>,
+    pub after_content: String,
+    pub created_at: String,
+    pub reviewed_at: Option<String>,
+}
