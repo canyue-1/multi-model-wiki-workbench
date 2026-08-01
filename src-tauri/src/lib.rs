@@ -13,6 +13,7 @@ pub mod wiki;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(commands::setup)
         .invoke_handler(tauri::generate_handler![
             commands::save_provider_key,
@@ -27,6 +28,7 @@ pub fn run() {
             commands::stop_discussion,
             commands::ingest_source,
             commands::list_review_items,
+            commands::list_wiki_pages,
             commands::set_review_status,
             commands::rollback_revision,
         ])

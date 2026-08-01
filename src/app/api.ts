@@ -110,6 +110,13 @@ export interface ReviewItem {
   reviewedAt?: string;
 }
 
+export interface WikiPage {
+  path: string;
+  title: string;
+  summary: string;
+  markdown: string;
+}
+
 export class AppError extends Error {
   readonly code: string;
 
@@ -161,6 +168,7 @@ export const api = {
     call<void>('stop_discussion', { conversationId }),
   ingestSource: (input: SourceInput) => call<SourceRecord>('ingest_source', { input }),
   listReviewItems: () => call<ReviewItem[]>('list_review_items'),
+  listWikiPages: () => call<WikiPage[]>('list_wiki_pages'),
   setReviewStatus: (revisionId: string, status: ReviewStatus) =>
     call<void>('set_review_status', { revisionId, status }),
   rollbackRevision: (revisionId: string) =>

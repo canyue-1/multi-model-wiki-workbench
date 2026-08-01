@@ -8,7 +8,7 @@ use thiserror::Error;
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
-use crate::domain::{ReviewStatus, WikiRevision};
+use crate::domain::{ReviewStatus, WikiPage, WikiRevision};
 use crate::repository::{NewWikiRevision, RepositoryError, WorkspaceRepository};
 
 #[derive(Debug, Clone)]
@@ -127,6 +127,14 @@ impl WikiService {
         Ok(())
     }
 
+    pub fn list_pages(&self) -> Result<Vec<WikiPage>, WikiError> {
+        let root = self.ensure_wiki_root()?;
+        let mut pages = Vec::new();
+        collect_pages(&root, &root, &mut pages)?;
+        pages.sort_by(|left, right| left.path.cmp(&right.path));
+        Ok(pages)
+    }
+
     fn wiki_root(&self) -> PathBuf {
         self.workspace_root.join("wiki")
     }
@@ -181,17 +189,15 @@ impl WikiService {
 
     fn rebuild_index(&self) -> Result<(), WikiError> {
         let root = self.ensure_wiki_root()?;
-        let mut pages = Vec::new();
-        collect_pages(&root, &root, &mut pages)?;
-        pages.sort_by(|left, right| left.0.cmp(&right.0));
+        let pages = self.list_pages()?;
         let mut index = String::from("# Wiki Index\n\n");
         if pages.is_empty() {
             index.push_str("暂无页面。\n");
         } else {
-            for (path, title, summary) in pages {
-                index.push_str(&format!("- [{title}]({path})"));
-                if !summary.is_empty() {
-                    index.push_str(&format!(" - {summary}"));
+            for page in pages {
+                index.push_str(&format!("- [{}]({})", page.title, page.path));
+                if !page.summary.is_empty() {
+                    index.push_str(&format!(" - {}", page.summary));
                 }
                 index.push('\n');
             }
@@ -270,7 +276,7 @@ fn validate_relative_path(path: &Path) -> Result<PathBuf, WikiError> {
 fn collect_pages(
     root: &Path,
     directory: &Path,
-    pages: &mut Vec<(String, String, String)>,
+    pages: &mut Vec<WikiPage>,
 ) -> Result<(), WikiError> {
     for entry in fs::read_dir(directory)? {
         let entry = entry?;
@@ -295,7 +301,12 @@ fn collect_pages(
         }
         let content = fs::read_to_string(path)?;
         let (title, summary) = page_metadata(&content, &relative);
-        pages.push((relative, title, summary));
+        pages.push(WikiPage {
+            path: relative,
+            title,
+            summary,
+            markdown: content,
+        });
     }
     Ok(())
 }

@@ -9,7 +9,7 @@ use url::Url;
 
 use crate::domain::{
     Conversation, ConversationSnapshot, CycleState, ModelMember, ProviderKind, ReviewItem,
-    ReviewStatus, SourceRecord,
+    ReviewStatus, SourceRecord, WikiPage,
 };
 use crate::providers::{
     AnthropicProvider, DeepSeekProvider, GeminiProvider, ModelProvider, OpenAiProvider,
@@ -240,6 +240,10 @@ impl AppState {
 
     pub async fn list_review_items(&self) -> Result<Vec<ReviewItem>, AppError> {
         Ok(self.repository.list_review_items().await?)
+    }
+
+    pub fn list_wiki_pages(&self) -> Result<Vec<WikiPage>, AppError> {
+        Ok(WikiService::new(&self.workspace_root, self.repository.clone()).list_pages()?)
     }
 
     pub async fn set_review_status(
@@ -478,6 +482,11 @@ pub async fn ingest_source(
 #[tauri::command]
 pub async fn list_review_items(state: State<'_, AppState>) -> Result<Vec<ReviewItem>, AppError> {
     state.list_review_items().await
+}
+
+#[tauri::command]
+pub fn list_wiki_pages(state: State<'_, AppState>) -> Result<Vec<WikiPage>, AppError> {
+    state.list_wiki_pages()
 }
 
 #[tauri::command(rename_all = "camelCase")]

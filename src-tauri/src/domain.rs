@@ -237,3 +237,12 @@ pub struct ConversationSnapshot {
     pub events: Vec<DiscussionRecord>,
     pub sources: Vec<SourceRecord>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WikiPage {
+    pub path: String,
+    pub title: String,
+    pub summary: String,
+    pub markdown: String,
+}
