@@ -6,8 +6,8 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::domain::{
-    Conversation, ConversationThread, Message, ModelMember, ProviderKind, ReviewItem, ReviewStatus,
-    SourceRecord, WikiRevision,
+    Conversation, ConversationThread, DiscussionRecord, Message, ModelMember, ProviderKind,
+    ReviewItem, ReviewStatus, SourceRecord, WikiRevision,
 };
 
 #[derive(Debug, Error)]
@@ -83,6 +83,18 @@ impl WorkspaceRepository {
             .execute(&self.pool)
             .await?;
         self.load_conversation(&id).await
+    }
+
+    pub async fn list_conversations(&self) -> Result<Vec<Conversation>, RepositoryError> {
+        let rows = sqlx::query(
+            "SELECT id, title, created_at FROM conversations ORDER BY created_at DESC, rowid DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(conversation_from_row)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
     pub async fn add_member(
@@ -206,6 +218,22 @@ impl WorkspaceRepository {
         })
     }
 
+    pub async fn load_events(
+        &self,
+        conversation_id: &str,
+    ) -> Result<Vec<DiscussionRecord>, RepositoryError> {
+        let rows = sqlx::query(
+            "SELECT id, conversation_id, trigger_message_id, member_id, kind, status, public_reason, created_at FROM events WHERE conversation_id = ? ORDER BY created_at, rowid",
+        )
+        .bind(conversation_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(discussion_record_from_row)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
     pub async fn save_source(
         &self,
         source: NewSource<'_>,
@@ -248,6 +276,45 @@ impl WorkspaceRepository {
         .fetch_one(&self.pool)
         .await?;
         Ok(source_from_row(row)?)
+    }
+
+    pub async fn attach_source(
+        &self,
+        conversation_id: &str,
+        source_id: &str,
+    ) -> Result<(), RepositoryError> {
+        sqlx::query(
+            "INSERT OR IGNORE INTO conversation_sources (conversation_id, source_id) VALUES (?, ?)",
+        )
+        .bind(conversation_id)
+        .bind(source_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn list_sources(
+        &self,
+        conversation_id: Option<&str>,
+    ) -> Result<Vec<SourceRecord>, RepositoryError> {
+        let rows = if let Some(conversation_id) = conversation_id {
+            sqlx::query(
+                "SELECT s.id, s.kind, s.title, s.source_uri, s.raw_path, s.content_hash, s.extracted_text, s.extraction_error, s.created_at FROM sources s JOIN conversation_sources cs ON cs.source_id = s.id WHERE cs.conversation_id = ? ORDER BY cs.created_at, cs.rowid",
+            )
+            .bind(conversation_id)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query(
+                "SELECT id, kind, title, source_uri, raw_path, content_hash, extracted_text, extraction_error, created_at FROM sources ORDER BY created_at DESC, rowid DESC",
+            )
+            .fetch_all(&self.pool)
+            .await?
+        };
+        rows.into_iter()
+            .map(source_from_row)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
     pub async fn create_wiki_revision(
@@ -325,11 +392,7 @@ impl WorkspaceRepository {
             .bind(id)
             .fetch_one(&self.pool)
             .await?;
-        Ok(Conversation {
-            id: row.try_get("id")?,
-            title: row.try_get("title")?,
-            created_at: row.try_get("created_at")?,
-        })
+        Ok(conversation_from_row(row)?)
     }
 
     async fn load_message(&self, id: &str) -> Result<Message, RepositoryError> {
@@ -341,6 +404,14 @@ impl WorkspaceRepository {
         .await?;
         Ok(message_from_row(row)?)
     }
+}
+
+fn conversation_from_row(row: sqlx::sqlite::SqliteRow) -> Result<Conversation, sqlx::Error> {
+    Ok(Conversation {
+        id: row.try_get("id")?,
+        title: row.try_get("title")?,
+        created_at: row.try_get("created_at")?,
+    })
 }
 
 fn message_from_row(row: sqlx::sqlite::SqliteRow) -> Result<Message, sqlx::Error> {
@@ -364,6 +435,21 @@ fn source_from_row(row: sqlx::sqlite::SqliteRow) -> Result<SourceRecord, sqlx::E
         content_hash: row.try_get("content_hash")?,
         extracted_text: row.try_get("extracted_text")?,
         extraction_error: row.try_get("extraction_error")?,
+        created_at: row.try_get("created_at")?,
+    })
+}
+
+fn discussion_record_from_row(
+    row: sqlx::sqlite::SqliteRow,
+) -> Result<DiscussionRecord, sqlx::Error> {
+    Ok(DiscussionRecord {
+        id: row.try_get("id")?,
+        conversation_id: row.try_get("conversation_id")?,
+        trigger_message_id: row.try_get("trigger_message_id")?,
+        member_id: row.try_get("member_id")?,
+        kind: row.try_get("kind")?,
+        status: row.try_get("status")?,
+        public_reason: row.try_get("public_reason")?,
         created_at: row.try_get("created_at")?,
     })
 }

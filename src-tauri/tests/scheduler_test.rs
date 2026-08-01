@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use async_trait::async_trait;
 use multimodel_wiki_workbench_lib::domain::{
@@ -105,6 +106,21 @@ async fn all_silent_models_end_the_cycle() {
 
     assert_eq!(result.model_message_count, 0);
     assert_eq!(result.stop_reason, StopReason::AllSilent);
+}
+
+#[tokio::test]
+async fn honors_a_user_stop_signal() {
+    let (repo, conversation_id, trigger_id, providers) = fixture(&[Behavior::Reply]).await;
+    let stop_signal = Arc::new(AtomicBool::new(true));
+    let scheduler = DiscussionScheduler::new(repo, providers).with_stop_signal(stop_signal);
+
+    let result = scheduler
+        .handle_event(DiscussionEvent::new(conversation_id, trigger_id))
+        .await
+        .unwrap();
+
+    assert_eq!(result.model_message_count, 0);
+    assert_eq!(result.stop_reason, StopReason::UserStopped);
 }
 
 async fn fixture(

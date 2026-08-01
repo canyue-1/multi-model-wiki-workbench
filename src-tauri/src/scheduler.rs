@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use thiserror::Error;
 
@@ -21,6 +22,7 @@ pub enum SchedulerError {
 pub struct DiscussionScheduler {
     repository: WorkspaceRepository,
     providers: HashMap<String, Arc<dyn ModelProvider>>,
+    stop_signal: Arc<AtomicBool>,
 }
 
 impl DiscussionScheduler {
@@ -31,7 +33,13 @@ impl DiscussionScheduler {
         Self {
             repository,
             providers,
+            stop_signal: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    pub fn with_stop_signal(mut self, stop_signal: Arc<AtomicBool>) -> Self {
+        self.stop_signal = stop_signal;
+        self
     }
 
     pub async fn handle_event(
@@ -44,6 +52,13 @@ impl DiscussionScheduler {
         let mut failed_members = HashSet::new();
 
         while let Some(event) = queue.pop_front() {
+            if self.stop_signal.load(Ordering::Relaxed) {
+                return Ok(cycle_state(
+                    model_message_count,
+                    StopReason::UserStopped,
+                    failures,
+                ));
+            }
             if model_message_count >= MESSAGE_LIMIT {
                 break;
             }
@@ -137,6 +152,13 @@ impl DiscussionScheduler {
             candidates
                 .sort_by(|left, right| right.0.cmp(&left.0).then_with(|| left.1.cmp(&right.1)));
             for (_, member_id) in candidates {
+                if self.stop_signal.load(Ordering::Relaxed) {
+                    return Ok(cycle_state(
+                        model_message_count,
+                        StopReason::UserStopped,
+                        failures,
+                    ));
+                }
                 if model_message_count >= MESSAGE_LIMIT {
                     break;
                 }
@@ -192,15 +214,27 @@ impl DiscussionScheduler {
             }
         }
 
-        Ok(CycleState {
+        Ok(cycle_state(
             model_message_count,
-            stop_reason: if model_message_count >= MESSAGE_LIMIT {
+            if model_message_count >= MESSAGE_LIMIT {
                 StopReason::MessageLimit
             } else {
                 StopReason::AllSilent
             },
             failures,
-        })
+        ))
+    }
+}
+
+fn cycle_state(
+    model_message_count: usize,
+    stop_reason: StopReason,
+    failures: Vec<MemberFailure>,
+) -> CycleState {
+    CycleState {
+        model_message_count,
+        stop_reason,
+        failures,
     }
 }
 

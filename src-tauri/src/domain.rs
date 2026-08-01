@@ -216,3 +216,24 @@ pub struct ReviewItem {
     pub created_at: String,
     pub reviewed_at: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscussionRecord {
+    pub id: String,
+    pub conversation_id: String,
+    pub trigger_message_id: Option<String>,
+    pub member_id: Option<String>,
+    pub kind: String,
+    pub status: String,
+    pub public_reason: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationSnapshot {
+    pub thread: ConversationThread,
+    pub events: Vec<DiscussionRecord>,
+    pub sources: Vec<SourceRecord>,
+}
