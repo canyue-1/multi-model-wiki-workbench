@@ -142,3 +142,17 @@ pub struct CycleState {
     pub stop_reason: StopReason,
     pub failures: Vec<MemberFailure>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceRecord {
+    pub id: String,
+    pub kind: String,
+    pub title: String,
+    pub source_uri: String,
+    pub raw_path: String,
+    pub content_hash: String,
+    pub extracted_text: Option<String>,
+    pub extraction_error: Option<String>,
+    pub created_at: String,
+}

@@ -6,6 +6,7 @@ pub mod providers;
 pub mod repository;
 pub mod scheduler;
 pub mod secrets;
+pub mod sources;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

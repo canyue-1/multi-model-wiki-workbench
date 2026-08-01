@@ -5,7 +5,9 @@ use sqlx::{Row, SqlitePool};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::domain::{Conversation, ConversationThread, Message, ModelMember, ProviderKind};
+use crate::domain::{
+    Conversation, ConversationThread, Message, ModelMember, ProviderKind, SourceRecord,
+};
 
 #[derive(Debug, Error)]
 pub enum RepositoryError {
@@ -20,6 +22,16 @@ pub enum RepositoryError {
 #[derive(Clone)]
 pub struct WorkspaceRepository {
     pool: SqlitePool,
+}
+
+pub struct NewSource<'a> {
+    pub kind: &'a str,
+    pub title: &'a str,
+    pub source_uri: &'a str,
+    pub raw_path: &'a str,
+    pub content_hash: &'a str,
+    pub extracted_text: Option<&'a str>,
+    pub extraction_error: Option<&'a str>,
 }
 
 impl WorkspaceRepository {
@@ -179,6 +191,50 @@ impl WorkspaceRepository {
         })
     }
 
+    pub async fn save_source(
+        &self,
+        source: NewSource<'_>,
+    ) -> Result<SourceRecord, RepositoryError> {
+        let id = Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO sources (id, kind, title, source_uri, raw_path, content_hash, extracted_text, extraction_error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&id)
+        .bind(source.kind)
+        .bind(source.title)
+        .bind(source.source_uri)
+        .bind(source.raw_path)
+        .bind(source.content_hash)
+        .bind(source.extracted_text)
+        .bind(source.extraction_error)
+        .execute(&self.pool)
+        .await?;
+        self.load_source(&id).await
+    }
+
+    pub async fn find_source_by_raw_path(
+        &self,
+        raw_path: &str,
+    ) -> Result<Option<SourceRecord>, RepositoryError> {
+        let row = sqlx::query(
+            "SELECT id, kind, title, source_uri, raw_path, content_hash, extracted_text, extraction_error, created_at FROM sources WHERE raw_path = ?",
+        )
+        .bind(raw_path)
+        .fetch_optional(&self.pool)
+        .await?;
+        row.map(source_from_row).transpose().map_err(Into::into)
+    }
+
+    pub async fn load_source(&self, id: &str) -> Result<SourceRecord, RepositoryError> {
+        let row = sqlx::query(
+            "SELECT id, kind, title, source_uri, raw_path, content_hash, extracted_text, extraction_error, created_at FROM sources WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(source_from_row(row)?)
+    }
+
     async fn load_conversation(&self, id: &str) -> Result<Conversation, RepositoryError> {
         let row = sqlx::query("SELECT id, title, created_at FROM conversations WHERE id = ?")
             .bind(id)
@@ -209,6 +265,20 @@ fn message_from_row(row: sqlx::sqlite::SqliteRow) -> Result<Message, sqlx::Error
         author_kind: row.try_get("author_kind")?,
         author_id: row.try_get("author_id")?,
         content: row.try_get("content")?,
+        created_at: row.try_get("created_at")?,
+    })
+}
+
+fn source_from_row(row: sqlx::sqlite::SqliteRow) -> Result<SourceRecord, sqlx::Error> {
+    Ok(SourceRecord {
+        id: row.try_get("id")?,
+        kind: row.try_get("kind")?,
+        title: row.try_get("title")?,
+        source_uri: row.try_get("source_uri")?,
+        raw_path: row.try_get("raw_path")?,
+        content_hash: row.try_get("content_hash")?,
+        extracted_text: row.try_get("extracted_text")?,
+        extraction_error: row.try_get("extraction_error")?,
         created_at: row.try_get("created_at")?,
     })
 }
