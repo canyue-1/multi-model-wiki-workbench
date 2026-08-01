@@ -1,0 +1,32 @@
+:root {
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #e8ecf3;
+  background: #0b0d12;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  padding: 2rem;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #7c8aa5;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+}
+
+h1 {
+  margin: 0.5rem 0 0;
+  font-size: clamp(2rem, 5vw, 4rem);
+}
