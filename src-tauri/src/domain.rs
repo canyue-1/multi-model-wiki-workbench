@@ -101,3 +101,44 @@ pub struct ModelReply {
     pub content: String,
     pub cited_source_ids: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscussionEvent {
+    pub conversation_id: String,
+    pub trigger_message_id: String,
+    pub mentioned_member_id: Option<String>,
+}
+
+impl DiscussionEvent {
+    pub fn new(conversation_id: impl Into<String>, trigger_message_id: impl Into<String>) -> Self {
+        Self {
+            conversation_id: conversation_id.into(),
+            trigger_message_id: trigger_message_id.into(),
+            mentioned_member_id: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum StopReason {
+    AllSilent,
+    MessageLimit,
+    UserStopped,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MemberFailure {
+    pub member_id: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CycleState {
+    pub model_message_count: usize,
+    pub stop_reason: StopReason,
+    pub failures: Vec<MemberFailure>,
+}

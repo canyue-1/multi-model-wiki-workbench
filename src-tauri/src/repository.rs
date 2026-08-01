@@ -111,6 +111,30 @@ impl WorkspaceRepository {
         self.load_message(&id).await
     }
 
+    pub async fn record_event(
+        &self,
+        conversation_id: &str,
+        trigger_message_id: &str,
+        member_id: &str,
+        kind: &str,
+        status: &str,
+        public_reason: Option<&str>,
+    ) -> Result<(), RepositoryError> {
+        sqlx::query(
+            "INSERT INTO events (id, conversation_id, trigger_message_id, member_id, kind, status, public_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(conversation_id)
+        .bind(trigger_message_id)
+        .bind(member_id)
+        .bind(kind)
+        .bind(status)
+        .bind(public_reason)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     pub async fn load_thread(
         &self,
         conversation_id: &str,

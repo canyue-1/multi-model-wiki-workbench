@@ -4,6 +4,7 @@
 pub mod domain;
 pub mod providers;
 pub mod repository;
+pub mod scheduler;
 pub mod secrets;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
