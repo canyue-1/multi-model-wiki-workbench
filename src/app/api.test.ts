@@ -12,6 +12,7 @@ const invokeMock = vi.mocked(invoke);
 describe('desktop API', () => {
   beforeEach(() => {
     invokeMock.mockReset();
+    window.localStorage.clear();
   });
 
   it('maps invoke failures to an actionable app error', async () => {
@@ -61,5 +62,17 @@ describe('desktop API', () => {
         value: 'C:\\资料\\note.md',
       },
     });
+  });
+
+  it('creates and reloads a conversation in browser preview mode', async () => {
+    invokeMock.mockRejectedValue(new Error('Tauri runtime unavailable'));
+
+    const created = await api.createConversation('浏览器预览讨论');
+    const conversations = await api.listConversations();
+    const snapshot = await api.loadSnapshot(created.id);
+
+    expect(created.title).toBe('浏览器预览讨论');
+    expect(conversations).toEqual([created]);
+    expect(snapshot.thread.conversation).toEqual(created);
   });
 });
