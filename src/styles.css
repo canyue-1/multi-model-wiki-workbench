@@ -320,6 +320,10 @@ strong {
 .provider-anthropic { background: #f8e7e0; color: #a64737; }
 .provider-gemini { background: #e6e8f8; color: #5548a6; }
 .provider-deepseek { background: #dfedef; color: #0c6971; }
+.provider-qwen { background: #e7eef8; color: #2563a6; }
+.provider-zhipu { background: #f2e8f8; color: #7b3f98; }
+.provider-moonshot { background: #ececec; color: #303030; }
+.provider-doubao { background: #f8ecd9; color: #9a5b16; }
 
 .roster-copy {
   min-width: 0;

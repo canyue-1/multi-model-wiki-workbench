@@ -1,4 +1,5 @@
 mod anthropic;
+mod compatible;
 mod deepseek;
 mod gemini;
 mod openai;
@@ -15,6 +16,7 @@ use crate::domain::{
 };
 
 pub use anthropic::AnthropicProvider;
+pub use compatible::OpenAiCompatibleProvider;
 pub use deepseek::DeepSeekProvider;
 pub use gemini::GeminiProvider;
 pub use openai::OpenAiProvider;

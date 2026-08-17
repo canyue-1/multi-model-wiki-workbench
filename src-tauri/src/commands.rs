@@ -12,8 +12,8 @@ use crate::domain::{
     ReviewStatus, SourceRecord, WikiPage,
 };
 use crate::providers::{
-    AnthropicProvider, DeepSeekProvider, GeminiProvider, ModelProvider, OpenAiProvider,
-    ProviderError,
+    AnthropicProvider, DeepSeekProvider, GeminiProvider, ModelProvider, OpenAiCompatibleProvider,
+    OpenAiProvider, ProviderError,
 };
 use crate::repository::{RepositoryError, WorkspaceRepository};
 use crate::scheduler::{DiscussionScheduler, SchedulerError};
@@ -90,6 +90,30 @@ impl ProviderFactory for SystemProviderFactory {
             ProviderKind::Anthropic => Arc::new(AnthropicProvider::new(api_key, model)),
             ProviderKind::Gemini => Arc::new(GeminiProvider::new(api_key, model)),
             ProviderKind::DeepSeek => Arc::new(DeepSeekProvider::new(api_key, model)),
+            ProviderKind::Qwen => Arc::new(OpenAiCompatibleProvider::new(
+                provider,
+                api_key,
+                model,
+                "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            )),
+            ProviderKind::Zhipu => Arc::new(OpenAiCompatibleProvider::new(
+                provider,
+                api_key,
+                model,
+                "https://open.bigmodel.cn/api/paas/v4",
+            )),
+            ProviderKind::Moonshot => Arc::new(OpenAiCompatibleProvider::new(
+                provider,
+                api_key,
+                model,
+                "https://api.moonshot.cn/v1",
+            )),
+            ProviderKind::Doubao => Arc::new(OpenAiCompatibleProvider::new(
+                provider,
+                api_key,
+                model,
+                "https://ark.cn-beijing.volces.com/api/v3",
+            )),
         }
     }
 }
@@ -291,7 +315,16 @@ impl AppState {
 }
 
 impl ProviderKind {
-    pub const ALL: [Self; 4] = [Self::OpenAi, Self::Anthropic, Self::Gemini, Self::DeepSeek];
+    pub const ALL: [Self; 8] = [
+        Self::OpenAi,
+        Self::Anthropic,
+        Self::Gemini,
+        Self::DeepSeek,
+        Self::Qwen,
+        Self::Zhipu,
+        Self::Moonshot,
+        Self::Doubao,
+    ];
 }
 
 fn default_model(provider: ProviderKind) -> &'static str {
@@ -300,6 +333,10 @@ fn default_model(provider: ProviderKind) -> &'static str {
         ProviderKind::Anthropic => "claude-sonnet-4-5",
         ProviderKind::Gemini => "gemini-2.5-flash",
         ProviderKind::DeepSeek => "deepseek-chat",
+        ProviderKind::Qwen => "qwen-plus",
+        ProviderKind::Zhipu => "glm-4.5",
+        ProviderKind::Moonshot => "moonshot-v1-8k",
+        ProviderKind::Doubao => "doubao-1-5-pro-32k-250115",
     }
 }
 

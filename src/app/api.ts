@@ -1,6 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 
-export type ProviderKind = 'openai' | 'anthropic' | 'gemini' | 'deepseek';
+export type ProviderKind =
+  | 'openai'
+  | 'anthropic'
+  | 'gemini'
+  | 'deepseek'
+  | 'qwen'
+  | 'zhipu'
+  | 'moonshot'
+  | 'doubao';
 export type StopReason = 'allSilent' | 'messageLimit' | 'userStopped';
 export type ReviewStatus = 'pending' | 'accepted' | 'incorrect' | 'rolledBack';
 
@@ -140,7 +148,16 @@ type WebState = {
 };
 
 const WEB_STORAGE_KEY = 'multimodel-wiki-workbench:web-state:v1';
-const WEB_PROVIDERS: ProviderKind[] = ['openai', 'anthropic', 'gemini', 'deepseek'];
+const WEB_PROVIDERS: ProviderKind[] = [
+  'openai',
+  'anthropic',
+  'gemini',
+  'deepseek',
+  'qwen',
+  'zhipu',
+  'moonshot',
+  'doubao',
+];
 
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {

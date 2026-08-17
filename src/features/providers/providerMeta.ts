@@ -10,6 +10,10 @@ export const PROVIDERS: Array<{
   { kind: 'anthropic', label: 'Anthropic', shortLabel: 'AN', defaultModel: 'claude-sonnet-4-5' },
   { kind: 'gemini', label: 'Google Gemini', shortLabel: 'GE', defaultModel: 'gemini-2.5-flash' },
   { kind: 'deepseek', label: 'DeepSeek', shortLabel: 'DS', defaultModel: 'deepseek-chat' },
+  { kind: 'qwen', label: '通义千问', shortLabel: '通', defaultModel: 'qwen-plus' },
+  { kind: 'zhipu', label: '智谱 GLM', shortLabel: '智', defaultModel: 'glm-4.5' },
+  { kind: 'moonshot', label: 'Kimi', shortLabel: 'KM', defaultModel: 'moonshot-v1-8k' },
+  { kind: 'doubao', label: '豆包', shortLabel: '豆', defaultModel: 'doubao-1-5-pro-32k-250115' },
 ];
 
 export const ROLE_PRESETS = [

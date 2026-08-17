@@ -10,6 +10,14 @@ pub enum ProviderKind {
     Gemini,
     #[serde(rename = "deepseek")]
     DeepSeek,
+    #[serde(rename = "qwen")]
+    Qwen,
+    #[serde(rename = "zhipu")]
+    Zhipu,
+    #[serde(rename = "moonshot")]
+    Moonshot,
+    #[serde(rename = "doubao")]
+    Doubao,
 }
 
 impl ProviderKind {
@@ -19,6 +27,10 @@ impl ProviderKind {
             Self::Anthropic => "anthropic",
             Self::Gemini => "gemini",
             Self::DeepSeek => "deepseek",
+            Self::Qwen => "qwen",
+            Self::Zhipu => "zhipu",
+            Self::Moonshot => "moonshot",
+            Self::Doubao => "doubao",
         }
     }
 
@@ -28,6 +40,10 @@ impl ProviderKind {
             "anthropic" => Some(Self::Anthropic),
             "gemini" => Some(Self::Gemini),
             "deepseek" => Some(Self::DeepSeek),
+            "qwen" => Some(Self::Qwen),
+            "zhipu" => Some(Self::Zhipu),
+            "moonshot" => Some(Self::Moonshot),
+            "doubao" => Some(Self::Doubao),
             _ => None,
         }
     }
