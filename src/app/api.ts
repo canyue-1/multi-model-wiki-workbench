@@ -198,11 +198,15 @@ function readWebState(): WebState {
     if (!raw) return emptyWebState();
     const parsed = JSON.parse(raw) as Partial<WebState>;
     const defaults = emptyWebState();
+    const storedProviders = Array.isArray(parsed.providers) ? parsed.providers : [];
     return {
       ...defaults,
       ...parsed,
       sourceConversations: parsed.sourceConversations ?? defaults.sourceConversations,
-      providers: parsed.providers ?? defaults.providers,
+      providers: WEB_PROVIDERS.map(
+        (provider) => storedProviders.find((status) => status.provider === provider)
+          ?? { provider, configured: false },
+      ),
     };
   } catch {
     return emptyWebState();
